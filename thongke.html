@@ -862,11 +862,25 @@
       }
     }
 
+    
+    function normalizeSurveysMap(surveysObj) {
+      if (!surveysObj || typeof surveysObj !== 'object') return {};
+      const map = {};
+      Object.entries(surveysObj).forEach(([k, v]) => {
+        if (!v) return;
+        const raw = String(k || '').trim();
+        const padded = raw.padStart(12, '0');
+        v.maHs = padded;
+        map[padded] = v;
+      });
+      return map;
+    }
+
     function initSurveys() {
       if (typeof google !== "undefined" && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(res => {
-            if (res && res.surveys) state.surveys = res.surveys;
+            if (res && res.surveys) state.surveys = normalizeSurveysMap(res.surveys);
             updateLiveIndicator(true);
             renderCurrentDashboard();
           })
@@ -886,7 +900,7 @@
           .then(res => {
             if (icon) icon.classList.remove("animate-spin");
             if (res && res.surveys && Object.keys(res.surveys).length > 0) {
-              state.surveys = res.surveys;
+              state.surveys = normalizeSurveysMap(res.surveys);
               updateLiveIndicator(true);
             } else {
               state.surveys = (res && res.surveys) || {};
@@ -979,7 +993,7 @@
       function onRefreshDone(res, isSuccess) {
         if (icon) icon.classList.remove("animate-spin");
         if (isSuccess && res && res.surveys) {
-          state.surveys = res.surveys;
+          state.surveys = normalizeSurveysMap(res.surveys);
           updateLiveIndicator(true);
           renderCurrentDashboard();
           if (userTriggered) showToast("✅", "Đã cập nhật dữ liệu mới nhất từ Google Sheets!");

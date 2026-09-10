@@ -753,6 +753,11 @@ function getInitialData() {
 /**
  * Kiểm tra xem học sinh đã từng gửi khảo sát chưa
  */
+
+function normalizeMaHs_(id) {
+  return String(id || "").trim().replace(/^0+/, "").toUpperCase();
+}
+
 function checkStudentSurveyStatus(maHs) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const resSheet = ss.getSheetByName(SHEET_NAMES.RESULTS);
@@ -762,7 +767,7 @@ function checkStudentSurveyStatus(maHs) {
 
   const values = resSheet.getDataRange().getValues();
   for (let i = values.length - 1; i >= 1; i--) {
-    if (String(values[i][1]).trim().toUpperCase() === String(maHs).trim().toUpperCase()) {
+    const rId = String(values[i][1] || "").trim().toUpperCase(); const tId = String(maHs || "").trim().toUpperCase(); if (rId === tId || normalizeMaHs_(rId) === normalizeMaHs_(tId)) {
       const missingStr = String(values[i][7] || "");
       let prevList = [];
       if (missingStr && !missingStr.includes("Đã có đủ")) {
@@ -801,7 +806,7 @@ function submitSurvey(data) {
   let existingRowIndex = -1;
 
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][1]).trim().toUpperCase() === String(data.maHs).trim().toUpperCase()) {
+    const rId = String(values[i][1] || "").trim().toUpperCase(); const tId = String(data.maHs || "").trim().toUpperCase(); if (rId === tId || normalizeMaHs_(rId) === normalizeMaHs_(tId)) {
       existingRowIndex = i + 1;
       break;
     }

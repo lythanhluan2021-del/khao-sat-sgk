@@ -638,7 +638,17 @@
         const sep = webUrl.includes("?") ? "&" : "?";
         fetch(webUrl + sep + "action=checkStatus&maHs=" + encodeURIComponent(maHs))
           .then(r => r.json())
-          .then(applyStatusResult)
+          .then(res => {
+            if (res && res.surveyed) {
+              applyStatusResult(res);
+            } else if (maHs && maHs.startsWith("0")) {
+              return fetch(webUrl + sep + "action=checkStatus&maHs=" + encodeURIComponent(maHs.replace(/^0+/, "")))
+                .then(r => r.json())
+                .then(applyStatusResult);
+            } else {
+              applyStatusResult(res);
+            }
+          })
           .catch(err => {
             console.warn("Lỗi kiểm tra trạng thái khảo sát từ Google Sheet:", err);
           });
