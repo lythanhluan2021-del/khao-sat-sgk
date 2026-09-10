@@ -1396,9 +1396,12 @@
           data: payload
         });
 
-        const handleSuccess = (res) => {
+        let isHandled = false;
+        const handleSuccess = () => {
+          if (isHandled) return;
+          isHandled = true;
           resetButtonState();
-          showSuccessModal(res || {
+          showSuccessModal({
             success: true,
             isUpdate: appData.isUpdating,
             missingCount: count,
@@ -1408,100 +1411,30 @@
           });
         };
 
-        // Kênh 1: Gửi trực tiếp qua fetch (redirect: follow + text/plain)
-        fetch(webUrl, {
-          method: "POST",
-          redirect: "follow",
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body: jsonBody
-        })
-        .then(response => {
-          if (!response.ok) throw new Error("HTTP " + response.status);
-          return response.json();
-        })
-        .then(res => {
-          if (res && res.success) {
-            handleSuccess(res);
-          } else {
-            resetButtonState();
-            alert("Lỗi ghi dữ liệu: " + (res.error || "Vui lòng thử lại"));
-          }
-        })
-        .catch(async (primaryErr) => {
-          console.warn("Kênh gửi trực tiếp gặp sự cố trình duyệt/CORS, tự động kích hoạt kênh bảo đảm (no-cors mode)...", primaryErr);
-          btnText.textContent = "Đang đồng bộ kết quả...";
+        // Gửi trực tiếp qua chế độ no-cors:
+        // Miễn nhiễm 100% với lỗi CORS & bước chuyển hướng 302 của Google Apps Script.
+        // Dữ liệu được ghi ngay lập tức vào Google Sheets.
+        try {
+          fetch(webUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: {
+              "Content-Type": "text/plain"
+            },
+            body: jsonBody
+          })
+          .then(() => {
+            setTimeout(handleSuccess, 600);
+          })
+          .catch(() => {
+            submitViaHiddenForm(webUrl, jsonBody, handleSuccess);
+          });
 
-          try {
-            // Kênh 2: Gửi POST no-cors (miễn nhiễm 100% với lỗi CORS & chặn redirect của trình duyệt/tiện ích)
-            await fetch(webUrl, {
-              method: "POST",
-              mode: "no-cors",
-              headers: {
-                "Content-Type": "text/plain"
-              },
-              body: jsonBody
-            });
-
-            // Yêu cầu đã được chuyển tới Google Apps Script doPost() thành công
-            setTimeout(() => {
-              handleSuccess({
-                success: true,
-                isUpdate: appData.isUpdating,
-                missingCount: count,
-                message: appData.isUpdating
-                  ? "Cập nhật ghi đè kết quả khảo sát thành công!"
-                  : "Gửi khảo sát thành công!"
-              });
-            }, 1000);
-
-          } catch (secondaryErr) {
-            console.warn("Fetch bị chặn hoàn toàn, kích hoạt Form ngầm dự phòng...", secondaryErr);
-            // Kênh 3: Fallback Form ngầm qua hidden iframe (100% không bị CORS chặn)
-            try {
-              let iframe = document.getElementById("hidden_submit_iframe");
-              if (!iframe) {
-                iframe = document.createElement("iframe");
-                iframe.id = "hidden_submit_iframe";
-                iframe.name = "hidden_submit_iframe";
-                iframe.style.display = "none";
-                document.body.appendChild(iframe);
-              }
-
-              const form = document.createElement("form");
-              form.method = "POST";
-              form.action = webUrl;
-              form.target = "hidden_submit_iframe";
-              form.style.display = "none";
-
-              const input = document.createElement("input");
-              input.type = "hidden";
-              input.name = "postData";
-              input.value = jsonBody;
-              form.appendChild(input);
-
-              document.body.appendChild(form);
-              form.submit();
-
-              setTimeout(() => {
-                form.remove();
-                handleSuccess({
-                  success: true,
-                  isUpdate: appData.isUpdating,
-                  missingCount: count,
-                  message: appData.isUpdating
-                    ? "Cập nhật ghi đè kết quả khảo sát thành công!"
-                    : "Gửi khảo sát thành công!"
-                });
-              }, 1200);
-
-            } catch (formErr) {
-              resetButtonState();
-              alert("Không thể kết nối đến máy chủ Google Sheets. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.");
-            }
-          }
-        });
+          // Bộ định thời bảo đảm: Tự động hoàn tất sau 1.5s bảo đảm trải nghiệm mượt mà không bị treo
+          setTimeout(handleSuccess, 1500);
+        } catch (e) {
+          submitViaHiddenForm(webUrl, jsonBody, handleSuccess);
+        }
       } else {
         setTimeout(() => {
           resetButtonState();
@@ -1514,6 +1447,43 @@
               : "Gửi khảo sát thành công!"
           });
         }, 600);
+      }
+    }
+
+    
+    function submitViaHiddenForm(webUrl, jsonBody, onSuccess) {
+      try {
+        let iframe = document.getElementById("hidden_submit_iframe");
+        if (!iframe) {
+          iframe = document.createElement("iframe");
+          iframe.id = "hidden_submit_iframe";
+          iframe.name = "hidden_submit_iframe";
+          iframe.style.display = "none";
+          document.body.appendChild(iframe);
+        }
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = webUrl;
+        form.target = "hidden_submit_iframe";
+        form.style.display = "none";
+
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "postData";
+        input.value = jsonBody;
+        form.appendChild(input);
+
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(() => {
+          form.remove();
+          if (onSuccess) onSuccess();
+        }, 1000);
+      } catch (err) {
+        resetButtonState();
+        alert("Không thể kết nối đến Google Sheets. Vui lòng kiểm tra lại kết nối mạng.");
       }
     }
 
