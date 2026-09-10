@@ -767,6 +767,7 @@
       parseParameters();
       populateGVCNClasses('10');
       initSurveys();
+      startAutoRefresh();
       renderCurrentDashboard();
     });
 
@@ -847,7 +848,8 @@
       if (!dot || !text || !badge) return;
       if (isLive) {
         dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-        text.textContent = "Google Sheets (Live)";
+        text.innerHTML = "Google Sheets <span class='text-[10px] text-emerald-300 font-extrabold bg-emerald-900/80 px-1 py-0.5 rounded'>5s</span>";
+        badge.title = "Hệ thống đang tự động đồng bộ liên tục mỗi 5 giây từ Google Sheets. Bấm để xem cài đặt.";
         badge.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/80 transition cursor-pointer";
       } else {
         if (getWebAppUrl()) {
@@ -986,11 +988,33 @@
       state.surveys = map;
     }
 
+    let isRefreshingData = false;
+    let autoRefreshTimer = null;
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = setInterval(() => {
+        if (!isRefreshingData) {
+          refreshData(false);
+        }
+      }, 5000);
+    }
+
     function refreshData(userTriggered) {
+      if (isRefreshingData && !userTriggered) return;
+      isRefreshingData = true;
+
       const icon = document.getElementById("refreshIcon");
-      if (icon) icon.classList.add("animate-spin");
+      if (userTriggered && icon) icon.classList.add("animate-spin");
+
+      const dot = document.getElementById("liveStatusDot");
+      if (!userTriggered && dot) {
+        dot.classList.add("opacity-40");
+        setTimeout(() => dot.classList.remove("opacity-40"), 400);
+      }
 
       function onRefreshDone(res, isSuccess) {
+        isRefreshingData = false;
         if (icon) icon.classList.remove("animate-spin");
         if (isSuccess && res && res.surveys) {
           state.surveys = normalizeSurveysMap(res.surveys);
